@@ -697,10 +697,24 @@ function getOrCreateWaClient(userId) {
   const client = new Client({
     authStrategy: new LocalAuth({ clientId: `user_${userId}`, dataPath: '/app/data/.wwebjs_auth' }),
     puppeteer: {
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+      args: [
+        '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu',
+        '--no-zygote', '--disable-extensions', '--disable-default-apps', '--no-first-run',
+      ],
       headless: true,
+      protocolTimeout: 300000, // 5 λεπτά περιθώριο για αργά/φορτωμένα μηχανήματα
     },
   });
+
+  // Ασφαλής εκκίνηση: αν ο Chromium αποτύχει (π.χ. λόγω φόρτου), ΔΕΝ κρασάρει ο server —
+  // καταγράφεται το σφάλμα και ξαναπροσπαθεί σε 30 δευτερόλεπτα.
+  function safeInit() {
+    client.initialize().catch(err => {
+      console.error(`[WA] init failed for user ${userId}: ${err.message} — retry in 30s`);
+      try { client.destroy().catch(() => {}); } catch {}
+      setTimeout(safeInit, 30000);
+    });
+  }
 
   client.on('qr', async qr => {
     entry.ready = false;
@@ -714,13 +728,18 @@ function getOrCreateWaClient(userId) {
   client.on('disconnected', () => {
     entry.ready = false;
     broadcastTo(userId, { type: 'status', connected: false });
-    setTimeout(() => client.initialize(), 4000);
+    setTimeout(safeInit, 4000);
   });
 
-  client.initialize();
+  safeInit();
   entry.instance = client;
   return entry;
 }
+
+// Δίχτυ ασφαλείας: απρόσμενα σφάλματα από τον Chromium/puppeteer δεν ρίχνουν τον server
+process.on('unhandledRejection', err => {
+  console.error('[SAFETY] Unhandled rejection:', err?.message || err);
+});
 
 // Στην εκκίνηση, άνοιγμα WhatsApp client ΜΟΝΟ για χρήστες με ενεργή πρόσβαση
 // (εξοικονόμηση RAM — κάθε client τρέχει δικό του Chromium ~200-300MB)
