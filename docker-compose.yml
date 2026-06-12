@@ -1,0 +1,15 @@
+services:
+  whatsapp-sender:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - app_data:/app/data
+    restart: unless-stopped
+    environment:
+      - JWT_SECRET=390755893b6e13978ea59f3589ee68e800e058d877ba3282a8a35068be5bed96
+      - ADMIN_KEY=5398549f67d5ec3f8408943a919df371d4e51a1dbb1bc98230962bedbe604ffc
+      - DAILY_LIMIT=300
+
+volumes:
+  app_data:

@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhatsApp Sender</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; }
+
+  /* ── Auth ── */
+  .auth-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .auth-card { background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 36px 32px; width: 380px; }
+  .auth-logo { text-align: center; margin-bottom: 24px; }
+  .auth-logo .icon { font-size: 2.6rem; }
+  .auth-logo h1 { font-size: 1.2rem; font-weight: 700; margin-top: 8px; }
+  .auth-logo p { color: #8b949e; font-size: .83rem; margin-top: 4px; }
+
+  .auth-tabs { display: flex; border-bottom: 1px solid #30363d; margin-bottom: 22px; }
+  .auth-tab { flex: 1; padding: 10px; text-align: center; cursor: pointer; font-size: .88rem; color: #8b949e; border-bottom: 2px solid transparent; transition: all .15s; margin-bottom: -1px; }
+  .auth-tab.active { color: #3fb950; border-bottom-color: #3fb950; font-weight: 600; }
+
+  .auth-field { margin-bottom: 13px; }
+  .auth-field label { display: block; font-size: .8rem; color: #8b949e; margin-bottom: 5px; }
+  .auth-field input { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; padding: 10px 12px; border-radius: 8px; font-size: .88rem; outline: none; transition: border-color .15s; }
+  .auth-field input:focus { border-color: #238636; }
+  .auth-field input.error { border-color: #f85149; }
+
+  .btn-auth { width: 100%; background: #238636; border: none; color: #fff; padding: 11px; border-radius: 8px; font-size: .92rem; font-weight: 600; cursor: pointer; margin-top: 4px; transition: background .15s; }
+  .btn-auth:hover { background: #2ea043; }
+
+  .auth-alert { border-radius: 8px; padding: 10px 12px; font-size: .83rem; margin-bottom: 14px; display: none; }
+  .auth-alert.visible { display: block; }
+  .auth-alert.error { background: rgba(248,81,73,.1); border: 1px solid rgba(248,81,73,.4); color: #f85149; }
+
+  /* trial notice on register */
+  .trial-notice { background: rgba(35,134,54,.1); border: 1px solid rgba(35,134,54,.3); color: #3fb950; border-radius: 8px; padding: 10px 12px; font-size: .81rem; margin-bottom: 14px; display: none; }
+  .trial-notice.visible { display: block; }
+
+  /* ── App ── */
+  .app { display: none; flex-direction: column; height: 100vh; }
+  .app.visible { display: flex; }
+
+  header { background: #161b22; border-bottom: 1px solid #30363d; padding: 12px 18px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  header h1 { font-size: 1rem; font-weight: 700; flex: 1; }
+  .status-dot { width: 9px; height: 9px; border-radius: 50%; background: #f85149; transition: background .3s; flex-shrink: 0; }
+  .status-dot.connected { background: #3fb950; }
+  .status-label { font-size: .8rem; color: #8b949e; }
+
+  .plan-chip { font-size: .75rem; padding: 3px 9px; border-radius: 20px; font-weight: 600; }
+  .plan-chip.trial   { background: rgba(88,166,255,.15); color: #58a6ff; border: 1px solid rgba(88,166,255,.3); }
+  .plan-chip.yearly  { background: rgba(63,185,80,.15);  color: #3fb950;  border: 1px solid rgba(63,185,80,.3); }
+  .plan-chip.per_use { background: rgba(210,153,34,.15); color: #e3b341;  border: 1px solid rgba(210,153,34,.3); }
+  .plan-chip.expired { background: rgba(248,81,73,.15);  color: #f85149;  border: 1px solid rgba(248,81,73,.3); }
+
+  .user-badge { display: flex; align-items: center; gap: 7px; background: #1c2128; border: 1px solid #30363d; border-radius: 20px; padding: 4px 12px 4px 7px; font-size: .8rem; }
+  .user-avatar { width: 22px; height: 22px; border-radius: 50%; background: #238636; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; text-transform: uppercase; }
+  .btn-logout { background: none; border: 1px solid #30363d; color: #8b949e; padding: 4px 11px; border-radius: 6px; cursor: pointer; font-size: .8rem; transition: all .15s; }
+  .btn-logout:hover { border-color: #f85149; color: #f85149; }
+
+  .layout { display: flex; flex: 1; overflow: hidden; }
+
+  /* ── Sidebar ── */
+  .sidebar { width: 310px; flex-shrink: 0; background: #161b22; border-right: 1px solid #30363d; display: flex; flex-direction: column; }
+
+  /* Sidebar tabs */
+  .sidebar-tabs { display: flex; border-bottom: 1px solid #30363d; flex-shrink: 0; }
+  .sidebar-tab { flex: 1; padding: 9px 6px; text-align: center; cursor: pointer; font-size: .8rem; color: #8b949e; border-bottom: 2px solid transparent; transition: all .15s; margin-bottom: -1px; user-select: none; }
+  .sidebar-tab.active { color: #3fb950; border-bottom-color: #3fb950; font-weight: 600; }
+  .sidebar-pane { display: none; flex: 1; flex-direction: column; min-height: 0; }
+  .sidebar-pane.active { display: flex; }
+
+  .wa-toolbar { padding: 9px 13px; border-bottom: 1px solid #30363d; display: flex; gap: 8px; align-items: center; }
+  .wa-toolbar input { flex: 1; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; padding: 6px 9px; border-radius: 6px; font-size: .8rem; outline: none; }
+  .wa-toolbar input:focus { border-color: #238636; }
+  .btn-wa-refresh { background: none; border: 1px solid #30363d; color: #8b949e; padding: 6px 9px; border-radius: 6px; cursor: pointer; font-size: .78rem; }
+  .btn-wa-refresh:hover { border-color: #58a6ff; color: #58a6ff; }
+  .wa-item { padding: 9px 13px; border-bottom: 1px solid #21262d; display: flex; align-items: center; gap: 9px; }
+  .wa-item .contact-info { flex: 1; min-width: 0; }
+  .btn-import { background: #1c2128; border: 1px solid #30363d; color: #3fb950; padding: 4px 9px; border-radius: 6px; cursor: pointer; font-size: .76rem; white-space: nowrap; transition: all .12s; flex-shrink: 0; }
+  .btn-import:hover:not(:disabled) { border-color: #3fb950; }
+  .btn-import:disabled { color: #484f58; cursor: default; border-color: #21262d; }
+  .sidebar-header { padding: 13px 15px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; }
+  .sidebar-header h2 { font-size: .88rem; font-weight: 600; }
+  .contact-count { font-size: .76rem; color: #8b949e; }
+
+  .contact-list { flex: 1; overflow-y: auto; }
+  .contact-empty { padding: 28px 16px; text-align: center; color: #484f58; font-size: .83rem; line-height: 1.6; }
+  .contact-item { padding: 9px 13px; border-bottom: 1px solid #21262d; display: flex; align-items: center; gap: 9px; cursor: pointer; transition: background .12s; user-select: none; }
+  .contact-item:hover { background: #1c2128; }
+  .contact-item.selected { background: #1f3a5f; }
+  .contact-checkbox { width: 14px; height: 14px; accent-color: #238636; flex-shrink: 0; cursor: pointer; }
+  .contact-info { flex: 1; min-width: 0; }
+  .contact-name { font-weight: 500; font-size: .86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .contact-phone { font-size: .74rem; color: #8b949e; }
+  .contact-actions { display: flex; gap: 3px; opacity: 0; transition: opacity .12s; }
+  .contact-item:hover .contact-actions { opacity: 1; }
+  .btn-icon { background: none; border: 1px solid transparent; color: #8b949e; padding: 3px 5px; border-radius: 5px; cursor: pointer; font-size: .75rem; transition: all .12s; }
+  .btn-icon:hover { border-color: #30363d; color: #e6edf3; }
+  .btn-icon.danger:hover { border-color: #f85149; color: #f85149; }
+
+  .add-form { padding: 11px 13px; border-top: 1px solid #30363d; background: #0d1117; }
+  .add-form-title { font-size: .73rem; color: #8b949e; margin-bottom: 7px; text-transform: uppercase; letter-spacing: .05em; }
+  .form-row { display: flex; gap: 6px; margin-bottom: 5px; }
+  .form-row input { flex: 1; background: #161b22; border: 1px solid #30363d; color: #e6edf3; padding: 7px 9px; border-radius: 6px; font-size: .81rem; outline: none; transition: border-color .12s; }
+  .form-row input:focus { border-color: #238636; }
+  .form-row input::placeholder { color: #484f58; }
+  .btn-add { background: #238636; border: none; color: #fff; padding: 7px 11px; border-radius: 6px; cursor: pointer; font-size: .81rem; font-weight: 500; transition: background .12s; white-space: nowrap; }
+  .btn-add:hover { background: #2ea043; }
+
+  /* ── Main ── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* QR */
+  .qr-overlay { background: #1c2128; border: 1px solid #30363d; border-radius: 12px; margin: 18px; padding: 22px; text-align: center; display: none; flex-shrink: 0; }
+  .qr-overlay.visible { display: block; }
+  .qr-overlay h3 { margin-bottom: 5px; font-size: .92rem; }
+  .qr-overlay p { color: #8b949e; font-size: .8rem; margin-bottom: 13px; }
+  .qr-overlay img { border-radius: 8px; background: white; padding: 8px; }
+
+  /* Payment wall */
+  .paywall { display: none; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 32px 24px; text-align: center; }
+  .paywall.visible { display: flex; }
+  .paywall-icon { font-size: 3rem; margin-bottom: 16px; }
+  .paywall h2 { font-size: 1.15rem; font-weight: 700; margin-bottom: 8px; }
+  .paywall p { color: #8b949e; font-size: .88rem; margin-bottom: 28px; max-width: 420px; line-height: 1.6; }
+  .plans { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin-bottom: 24px; }
+  .plan-card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 24px 28px; width: 200px; text-align: center; cursor: pointer; transition: all .15s; }
+  .plan-card:hover, .plan-card.highlight { border-color: #238636; background: #1a2e1a; }
+  .plan-card .price { font-size: 2rem; font-weight: 800; color: #3fb950; }
+  .plan-card .price span { font-size: .85rem; font-weight: 400; color: #8b949e; }
+  .plan-card .plan-name { font-size: .82rem; font-weight: 600; margin-top: 4px; margin-bottom: 10px; }
+  .plan-card .plan-desc { font-size: .78rem; color: #8b949e; line-height: 1.5; }
+  .plan-badge { display: inline-block; background: #238636; color: #fff; font-size: .68rem; font-weight: 700; padding: 2px 7px; border-radius: 10px; margin-bottom: 8px; text-transform: uppercase; }
+  .paywall-contact { font-size: .82rem; color: #8b949e; }
+  .paywall-contact strong { color: #58a6ff; }
+
+  /* Message area */
+  .message-area { flex: 1; display: flex; flex-direction: column; padding: 18px; gap: 13px; overflow-y: auto; }
+  .message-area h2 { font-size: .92rem; font-weight: 600; }
+  .select-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .81rem; color: #8b949e; }
+  .select-bar a { color: #58a6ff; cursor: pointer; }
+  .select-bar a:hover { text-decoration: underline; }
+  textarea { flex: 1; min-height: 150px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; padding: 12px; border-radius: 8px; font-size: .9rem; font-family: inherit; resize: vertical; outline: none; transition: border-color .15s; line-height: 1.5; }
+  textarea:focus { border-color: #238636; }
+  textarea::placeholder { color: #484f58; }
+  .send-bar { display: flex; align-items: center; gap: 12px; }
+  .btn-send { background: #238636; border: none; color: #fff; padding: 10px 24px; border-radius: 8px; cursor: pointer; font-size: .9rem; font-weight: 600; transition: background .15s; display: flex; align-items: center; gap: 8px; }
+  .btn-send:hover:not(:disabled) { background: #2ea043; }
+  .btn-send:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+
+  /* Personalization */
+  .personalize-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .btn-tag { background: #1c2128; border: 1px solid #30363d; color: #58a6ff; padding: 5px 11px; border-radius: 6px; cursor: pointer; font-size: .78rem; transition: border-color .12s; }
+  .btn-tag:hover { border-color: #58a6ff; }
+  .personalize-hint { font-size: .75rem; color: #8b949e; }
+  .personalize-hint code { background: #1c2128; padding: 1px 6px; border-radius: 4px; color: #e3b341; font-size: .73rem; }
+  .msg-preview { display: none; background: #1c2128; border: 1px solid #30363d; border-left: 3px solid #238636; border-radius: 8px; padding: 9px 12px; font-size: .8rem; color: #8b949e; white-space: pre-wrap; }
+  .msg-preview.visible { display: block; }
+  .msg-preview strong { color: #3fb950; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; display: block; margin-bottom: 3px; }
+
+  /* Groups */
+  .group-bar { padding: 8px 13px; border-bottom: 1px solid #30363d; display: flex; gap: 7px; align-items: center; }
+  .group-bar select { flex: 1; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; padding: 6px 8px; border-radius: 6px; font-size: .79rem; outline: none; min-width: 0; }
+  .btn-groups { background: none; border: 1px solid #30363d; color: #8b949e; padding: 6px 9px; border-radius: 6px; cursor: pointer; font-size: .78rem; white-space: nowrap; }
+  .btn-groups:hover { border-color: #58a6ff; color: #58a6ff; }
+  .group-chip { display: inline-block; background: rgba(88,166,255,.13); color: #58a6ff; border: 1px solid rgba(88,166,255,.3); font-size: .67rem; padding: 1px 7px; border-radius: 10px; margin-left: 5px; vertical-align: 1px; }
+  .form-row select { flex: 1; background: #161b22; border: 1px solid #30363d; color: #e6edf3; padding: 7px 9px; border-radius: 6px; font-size: .81rem; outline: none; }
+  .modal select { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; padding: 9px 11px; border-radius: 6px; font-size: .86rem; outline: none; margin-bottom: 9px; }
+  .group-row { display: flex; gap: 6px; margin-bottom: 7px; align-items: center; }
+  .group-row input { flex: 1; margin-bottom: 0 !important; }
+  .group-list-wrap { max-height: 260px; overflow-y: auto; margin-bottom: 10px; }
+  .group-empty-note { color: #484f58; font-size: .8rem; text-align: center; padding: 12px 0; }
+
+  /* Attachment */
+  .attach-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .btn-attach { background: #1c2128; border: 1px solid #30363d; color: #8b949e; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: .78rem; transition: all .12s; }
+  .btn-attach:hover { border-color: #58a6ff; color: #58a6ff; }
+  .attach-chip { display: none; align-items: center; gap: 7px; background: rgba(88,166,255,.1); border: 1px solid rgba(88,166,255,.3); color: #58a6ff; padding: 4px 10px; border-radius: 14px; font-size: .77rem; max-width: 320px; }
+  .attach-chip.visible { display: inline-flex; }
+  .attach-chip .a-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .attach-chip button { background: none; border: none; color: #58a6ff; cursor: pointer; font-size: .85rem; padding: 0; line-height: 1; }
+  .attach-chip button:hover { color: #f85149; }
+
+  /* Anti-ban warning */
+  .warn-note { background: rgba(210,153,34,.08); border: 1px solid rgba(210,153,34,.3); color: #e3b341; border-radius: 8px; padding: 8px 12px; font-size: .76rem; line-height: 1.5; }
+
+  /* Scheduled sends */
+  .btn-schedule { background: none; border: 1px solid #30363d; color: #58a6ff; padding: 11px 18px; border-radius: 8px; font-size: .9rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+  .btn-schedule:hover:not(:disabled) { border-color: #58a6ff; background: rgba(88,166,255,.08); }
+  .btn-schedule:disabled { color: #484f58; border-color: #21262d; cursor: not-allowed; }
+  .sched-panel { display: none; background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 10px 13px; }
+  .sched-panel.visible { display: block; }
+  .sched-title { font-size: .74rem; color: #8b949e; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 7px; }
+  .sched-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #21262d; font-size: .81rem; }
+  .sched-item:last-child { border-bottom: none; }
+  .sched-when { color: #58a6ff; white-space: nowrap; font-weight: 600; }
+  .sched-snippet { flex: 1; color: #8b949e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sched-status { font-size: .72rem; white-space: nowrap; }
+  .sched-status.failed { color: #f85149; }
+  .sched-status.sent { color: #3fb950; }
+  .sched-cancel { background: none; border: none; color: #8b949e; cursor: pointer; font-size: .85rem; }
+  .sched-cancel:hover { color: #f85149; }
+  .modal input[type="datetime-local"] { color-scheme: dark; }
+
+  /* History */
+  .area-header { display: flex; align-items: center; justify-content: space-between; }
+  .btn-history { background: #1c2128; border: 1px solid #30363d; color: #8b949e; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: .78rem; transition: all .12s; }
+  .btn-history:hover { border-color: #58a6ff; color: #58a6ff; }
+  .history-modal { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 0; width: 560px; max-width: calc(100vw - 32px); max-height: 80vh; display: flex; flex-direction: column; }
+  .history-header { padding: 16px 20px; border-bottom: 1px solid #30363d; display: flex; align-items: center; justify-content: space-between; }
+  .history-header h3 { font-size: .95rem; }
+  .history-close { background: none; border: none; color: #8b949e; font-size: 1.1rem; cursor: pointer; }
+  .history-close:hover { color: #e6edf3; }
+  .history-list { overflow-y: auto; padding: 8px; }
+  .history-empty { padding: 36px; text-align: center; color: #484f58; font-size: .85rem; }
+  .history-item { border: 1px solid #21262d; border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: border-color .12s; }
+  .history-item:hover { border-color: #30363d; }
+  .history-item-head { padding: 10px 13px; display: flex; align-items: center; gap: 10px; }
+  .history-date { font-size: .74rem; color: #8b949e; white-space: nowrap; }
+  .history-snippet { flex: 1; font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-counts { font-size: .76rem; white-space: nowrap; }
+  .history-counts .c-ok { color: #3fb950; }
+  .history-counts .c-fail { color: #f85149; }
+  .history-detail { display: none; border-top: 1px solid #21262d; padding: 11px 13px; }
+  .history-item.open .history-detail { display: block; }
+  .history-body { background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 9px 11px; font-size: .82rem; white-space: pre-wrap; margin-bottom: 10px; }
+  .history-recips { font-size: .79rem; max-height: 180px; overflow-y: auto; }
+  .history-recip { padding: 3px 0; display: flex; gap: 8px; align-items: baseline; }
+  .history-recip .r-status { width: 14px; flex-shrink: 0; }
+  .history-recip .r-name { color: #e6edf3; }
+  .history-recip .r-phone { color: #8b949e; font-size: .73rem; }
+  .history-recip .r-err { color: #f85149; font-size: .73rem; }
+
+  .log { background: #0d1117; border: 1px solid #21262d; border-radius: 8px; padding: 9px 11px; font-size: .78rem; font-family: monospace; max-height: 130px; overflow-y: auto; display: none; }
+  .log.visible { display: block; }
+  .log-line { margin-bottom: 3px; }
+  .log-line.ok { color: #3fb950; }
+  .log-line.fail { color: #f85149; }
+  .log-line.info { color: #8b949e; }
+
+  /* Subscription info bar */
+  .sub-bar { background: #1c2128; border-bottom: 1px solid #30363d; padding: 7px 18px; font-size: .78rem; color: #8b949e; display: flex; gap: 16px; align-items: center; flex-shrink: 0; }
+  .sub-bar span strong { color: #e6edf3; }
+  .sub-bar .warn { color: #e3b341; }
+
+  /* Edit Modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .modal-bg.visible { display: flex; }
+  .modal { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 22px; width: 310px; }
+  .modal h3 { margin-bottom: 14px; font-size: .92rem; }
+  .modal input { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; padding: 9px 11px; border-radius: 6px; font-size: .86rem; outline: none; margin-bottom: 9px; }
+  .modal input:focus { border-color: #238636; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+  .btn-cancel { background: none; border: 1px solid #30363d; color: #e6edf3; padding: 7px 13px; border-radius: 6px; cursor: pointer; font-size: .82rem; }
+  .btn-save { background: #238636; border: none; color: #fff; padding: 7px 13px; border-radius: 6px; cursor: pointer; font-size: .82rem; font-weight: 500; }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ── Auth ─────────────────────────────────────────────────────────────── -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="icon">💬</div>
+      <h1>WhatsApp Sender</h1>
+      <p>Σύνδεση ή δημιουργία λογαριασμού</p>
+    </div>
+
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tabLogin"    onclick="switchTab('login')">Σύνδεση</div>
+      <div class="auth-tab"        id="tabRegister" onclick="switchTab('register')">Εγγραφή</div>
+    </div>
+
+    <div class="auth-alert error" id="authError"></div>
+
+    <div class="trial-notice visible" id="trialNotice">
+      🎉 Δωρεάν δοκιμή 1 μήνα — χωρίς κάρτα!
+    </div>
+
+    <div class="auth-field">
+      <label>Όνομα χρήστη</label>
+      <input id="authUsername" type="text" placeholder="username" autocomplete="username" />
+    </div>
+    <div class="auth-field">
+      <label>Κωδικός</label>
+      <input id="authPassword" type="password" placeholder="••••••" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter') submitAuth()" />
+    </div>
+    <div class="auth-field" id="confirmField" style="display:none">
+      <label>Επιβεβαίωση Κωδικού</label>
+      <input id="authConfirm" type="password" placeholder="••••••"
+        onkeydown="if(event.key==='Enter') submitAuth()" />
+    </div>
+    <div class="auth-field" id="phoneField" style="display:none">
+      <label>Τηλέφωνο επικοινωνίας</label>
+      <input id="authPhone" type="text" placeholder="π.χ. 6912345678"
+        onkeydown="if(event.key==='Enter') submitAuth()" />
+    </div>
+
+    <button class="btn-auth" onclick="submitAuth()" id="authBtn">Σύνδεση</button>
+  </div>
+</div>
+
+<!-- ── App ──────────────────────────────────────────────────────────────── -->
+<div class="app" id="app">
+  <header>
+    <div class="status-dot" id="statusDot"></div>
+    <h1>WhatsApp Sender</h1>
+    <span class="status-label" id="statusLabel">Αποσυνδεδεμένο</span>
+    <span class="plan-chip" id="planChip"></span>
+    <div class="user-badge">
+      <div class="user-avatar" id="userAvatar"></div>
+      <span id="userNameLabel"></span>
+    </div>
+    <button class="btn-logout" onclick="logout()">Έξοδος</button>
+  </header>
+
+  <div class="sub-bar" id="subBar"></div>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-tabs">
+        <div class="sidebar-tab active" id="tabMyContacts" onclick="switchContactTab('mine')">👤 Οι επαφές μου</div>
+        <div class="sidebar-tab" id="tabWaContacts" onclick="switchContactTab('wa')">💬 Από WhatsApp</div>
+      </div>
+
+      <!-- Δικές μου επαφές -->
+      <div class="sidebar-pane active" id="paneMine">
+        <div class="sidebar-header">
+          <h2>Επαφές</h2>
+          <span class="contact-count" id="contactCount">0 επαφές</span>
+        </div>
+        <div class="group-bar">
+          <select id="groupFilter" onchange="renderContacts()">
+            <option value="">Όλες οι ομάδες</option>
+          </select>
+          <button class="btn-groups" onclick="openGroups()">⚙️ Ομάδες</button>
+          <input type="file" id="importInput" style="display:none" accept=".xlsx,.xls,.csv" onchange="onImportFile(event)" />
+          <button class="btn-groups" onclick="document.getElementById('importInput').click()" title="Εισαγωγή επαφών από Excel (στήλες: Όνομα, Επώνυμο, Τηλέφωνο, Προσφώνηση, Ομάδα)">📥 Excel</button>
+        </div>
+        <div class="contact-list" id="contactList"></div>
+        <div class="add-form">
+          <div class="add-form-title">Νέα Επαφή</div>
+          <div class="form-row">
+            <input id="addName" type="text" placeholder="Όνομα" />
+            <input id="addLastName" type="text" placeholder="Επώνυμο" />
+          </div>
+          <div class="form-row"><input id="addSalutation" type="text" placeholder="Προσφώνηση στο μήνυμα (π.χ. κ. Γιώργο)" /></div>
+          <div class="form-row"><select id="addGroup"><option value="">— Χωρίς ομάδα —</option></select></div>
+          <div class="form-row">
+            <input id="addPhone" type="text" placeholder="Τηλέφωνο (π.χ. 6912345678)" />
+            <button class="btn-add" onclick="addContact()">+ Προσθήκη</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Επαφές από WhatsApp -->
+      <div class="sidebar-pane" id="paneWa">
+        <div class="wa-toolbar">
+          <input id="waSearch" type="text" placeholder="Αναζήτηση..." oninput="renderWaContacts()" />
+          <button class="btn-wa-refresh" onclick="loadWaContacts(true)" title="Ανανέωση">↻</button>
+        </div>
+        <div class="contact-list" id="waContactList">
+          <div class="contact-empty">Πάτα την καρτέλα για φόρτωση επαφών από το WhatsApp σου</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="qr-overlay" id="qrOverlay">
+        <h3>📱 Σκανάρισε για να συνδεθεί το WhatsApp σου</h3>
+        <p>Άνοιξε WhatsApp → Συνδεδεμένες Συσκευές → Σύνδεση Συσκευής</p>
+        <img id="qrImg" src="" alt="QR Code" width="260" height="260" />
+      </div>
+
+      <!-- Payment wall -->
+      <div class="paywall" id="paywall">
+        <div class="paywall-icon">🔒</div>
+        <h2>Η δωρεάν περίοδος έληξε</h2>
+        <p>Επέλεξε ένα πλάνο για να συνεχίσεις να στέλνεις μηνύματα. Επικοινώνησε μαζί μας για να ενεργοποιήσεις τον λογαριασμό σου.</p>
+        <div class="plans">
+          <div class="plan-card highlight">
+            <div class="plan-badge">Προτεινόμενο</div>
+            <div class="price">150€<span>/έτος</span></div>
+            <div class="plan-name">Ετήσιο Πλάνο</div>
+            <div class="plan-desc">Απεριόριστες αποστολές για 12 μήνες</div>
+          </div>
+          <div class="plan-card">
+            <div style="height:22px"></div>
+            <div class="price">10€<span>/αποστολή</span></div>
+            <div class="plan-name">Pay as you go</div>
+            <div class="plan-desc">Πληρώνεις μόνο όταν στέλνεις</div>
+          </div>
+        </div>
+        <div class="paywall-contact">
+          Επικοινώνησε μαζί μας για ενεργοποίηση:<br>
+          <strong>+30 69X XXX XXXX</strong> &nbsp;|&nbsp; <strong>info@example.com</strong>
+        </div>
+      </div>
+
+      <!-- Message area (shown only when access is ok) -->
+      <div class="message-area" id="messageArea" style="display:none">
+        <div class="area-header">
+          <h2>Αποστολή Μηνύματος</h2>
+          <button class="btn-history" onclick="openHistory()">🕘 Ιστορικό</button>
+        </div>
+        <div class="select-bar">
+          <span id="selectedInfo">Καμία επιλογή — θα σταλεί σε όλες τις επαφές</span>
+          <a onclick="selectAll()">Επιλογή όλων</a>
+          <a onclick="selectNone()">Αποεπιλογή</a>
+        </div>
+        <div class="personalize-bar">
+          <button class="btn-tag" onclick="insertNameTag()">+ Όνομα παραλήπτη</button>
+          <span class="personalize-hint">Γράψε <code>{όνομα}</code> στο μήνυμα — θα αντικατασταθεί με την <b>προσφώνηση</b> κάθε επαφής. Αν η επαφή δεν έχει προσφώνηση, αφαιρείται.</span>
+        </div>
+        <textarea id="msgText" placeholder="π.χ. Γεια σου {όνομα}! Το Σάββατο έχουμε τουρνουά..." oninput="updatePreview()"></textarea>
+        <div class="msg-preview" id="msgPreview"></div>
+        <div class="attach-bar">
+          <input type="file" id="fileInput" style="display:none" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onchange="onFilePicked(event)" />
+          <button class="btn-attach" onclick="document.getElementById('fileInput').click()">📎 Επισύναψη εικόνας/αρχείου</button>
+          <span class="attach-chip" id="attachChip">
+            <span class="a-name" id="attachName"></span>
+            <button onclick="clearAttachment()" title="Αφαίρεση">✕</button>
+          </span>
+        </div>
+        <div class="warn-note">⚠️ Η μαζική αποστολή μηνυμάτων αντίκειται στους όρους χρήσης του WhatsApp και ενέχει κίνδυνο αποκλεισμού (ban) του αριθμού σου. Στείλε μόνο σε επαφές που έχουν συναινέσει να λαμβάνουν μηνύματά σου, και με λογικό όγκο.</div>
+        <div class="send-bar">
+          <button class="btn-send" id="sendBtn" onclick="sendMessages()" disabled>▶ Αποστολή</button>
+          <button class="btn-schedule" id="scheduleBtn" onclick="openSchedule()">🕐 Προγραμματισμός</button>
+          <span class="send-info" id="sendInfo"></span>
+        </div>
+        <div class="sched-panel" id="schedPanel">
+          <div class="sched-title">🕐 Προγραμματισμένες αποστολές</div>
+          <div id="schedList"></div>
+        </div>
+        <div class="log" id="log"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-bg" id="editModal">
+  <div class="modal">
+    <h3>Επεξεργασία Επαφής</h3>
+    <input id="editName" type="text" placeholder="Όνομα" />
+    <input id="editLastName" type="text" placeholder="Επώνυμο" />
+    <input id="editSalutation" type="text" placeholder="Προσφώνηση στο μήνυμα (π.χ. κ. Γιώργο)" />
+    <input id="editPhone" type="text" placeholder="Τηλέφωνο" />
+    <select id="editGroup"><option value="">— Χωρίς ομάδα —</option></select>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Ακύρωση</button>
+      <button class="btn-save" onclick="saveEdit()">Αποθήκευση</button>
+    </div>
+  </div>
+</div>
+
+<!-- Groups Modal -->
+<div class="modal-bg" id="groupsModal">
+  <div class="modal" style="width:360px">
+    <h3>⚙️ Ομάδες Επαφών</h3>
+    <div class="group-list-wrap" id="groupList"></div>
+    <div class="group-row">
+      <input id="newGroupName" type="text" placeholder="Νέα ομάδα (π.χ. Χονδρική)"
+        onkeydown="if(event.key==='Enter') createGroup()" />
+      <button class="btn-save" onclick="createGroup()">+ Δημιουργία</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeGroups()">Κλείσιμο</button>
+    </div>
+  </div>
+</div>
+
+<!-- Schedule Modal -->
+<div class="modal-bg" id="scheduleModal">
+  <div class="modal" style="width:380px">
+    <h3>🕐 Προγραμματισμός Αποστολής</h3>
+    <p style="font-size:.8rem;color:#8b949e;margin:6px 0 14px">Το μήνυμα (και τυχόν συνημμένο) θα σταλεί αυτόματα στις επιλεγμένες επαφές την ώρα που θα ορίσεις — ακόμα κι αν έχεις κλείσει τη σελίδα.</p>
+    <div id="schedSummary" style="font-size:.8rem;color:#8b949e;margin-bottom:12px"></div>
+    <input id="scheduleAt" type="datetime-local" />
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeSchedule()">Ακύρωση</button>
+      <button class="btn-save" onclick="confirmSchedule()">Προγραμματισμός</button>
+    </div>
+  </div>
+</div>
+
+<!-- History Modal -->
+<div class="modal-bg" id="historyModal">
+  <div class="history-modal">
+    <div class="history-header">
+      <h3>🕘 Ιστορικό Αποστολών</h3>
+      <button class="history-close" onclick="closeHistory()">✕</button>
+    </div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+</div>
+
+<script>
+let contacts = [], selected = new Set(), editId = null;
+let waConnected = false, ws = null;
+let currentTab = 'login', currentUser = null;
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+  document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
+  document.getElementById('authBtn').textContent = tab === 'login' ? 'Σύνδεση' : 'Εγγραφή';
+  document.getElementById('confirmField').style.display = tab === 'register' ? 'block' : 'none';
+  document.getElementById('phoneField').style.display = tab === 'register' ? 'block' : 'none';
+  document.getElementById('trialNotice').classList.toggle('visible', tab === 'register');
+  document.getElementById('authError').classList.remove('visible');
+}
+
+async function submitAuth() {
+  const username = document.getElementById('authUsername').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const errEl = document.getElementById('authError');
+  errEl.classList.remove('visible');
+
+  if (!username || !password) {
+    errEl.textContent = 'Συμπλήρωσε όνομα χρήστη και κωδικό';
+    errEl.classList.add('visible'); return;
+  }
+
+  let phone = '';
+  if (currentTab === 'register') {
+    const confirm = document.getElementById('authConfirm').value;
+    if (password !== confirm) {
+      errEl.textContent = 'Οι κωδικοί δεν ταιριάζουν';
+      document.getElementById('authConfirm').classList.add('error');
+      errEl.classList.add('visible'); return;
+    }
+    document.getElementById('authConfirm').classList.remove('error');
+    phone = document.getElementById('authPhone').value.trim();
+    if (phone.replace(/[\s\-\(\)\+]/g, '').length < 10) {
+      errEl.textContent = 'Συμπλήρωσε έγκυρο τηλέφωνο επικοινωνίας';
+      errEl.classList.add('visible'); return;
+    }
+  }
+
+  const r = await fetch(currentTab === 'login' ? '/api/login' : '/api/register', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password, phone })
+  });
+  const data = await r.json();
+  if (!r.ok) { errEl.textContent = data.error; errEl.classList.add('visible'); return; }
+  await loadMe();
+}
+
+async function loadMe() {
+  try {
+    const r = await fetch('/api/me');
+    if (!r.ok) return;
+    const data = await r.json();
+    if (!data.id) return;
+    currentUser = data;
+    showApp(currentUser);
+  } catch { /* not logged in or no server */ }
+}
+
+function showApp(user) {
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+  document.getElementById('userNameLabel').textContent = user.username;
+  document.getElementById('userAvatar').textContent = user.username[0].toUpperCase();
+
+  renderPlanUI(user);
+  connectWS();
+  fetch('/api/wa/connect', { method: 'POST' });
+  loadGroups().then(loadContacts);
+  loadSchedules();
+}
+
+function renderPlanUI(user) {
+  const access = user.access;
+  const chip = document.getElementById('planChip');
+  const subBar = document.getElementById('subBar');
+  const paywall = document.getElementById('paywall');
+  const msgArea = document.getElementById('messageArea');
+
+  // Plan chip
+  if (!access.ok) {
+    chip.textContent = 'Ληγμένο'; chip.className = 'plan-chip expired';
+  } else if (access.plan === 'trial') {
+    chip.textContent = 'Δοκιμή'; chip.className = 'plan-chip trial';
+  } else if (access.plan === 'yearly') {
+    chip.textContent = 'Ετήσιο'; chip.className = 'plan-chip yearly';
+  } else if (access.plan === 'per_use') {
+    chip.textContent = `${access.credits} αποστολ${access.credits === 1 ? 'ή' : 'ές'}`; chip.className = 'plan-chip per_use';
+  }
+
+  // Sub info bar
+  const reg = new Date(user.created_at).toLocaleDateString('el-GR');
+  let barParts = [`<span>Εγγραφή: <strong>${reg}</strong></span>`];
+  if (access.plan === 'trial' && access.ok) {
+    const daysLeft = Math.ceil((new Date(user.trial_ends_at) - new Date()) / 86400000);
+    const cls = daysLeft <= 7 ? 'warn' : '';
+    barParts.push(`<span class="${cls}">Δωρεάν δοκιμή: <strong>${daysLeft} μέρ${daysLeft === 1 ? 'α' : 'ες'} απομένουν</strong></span>`);
+  } else if (access.plan === 'yearly' && access.ok) {
+    const until = new Date(user.subscription_until).toLocaleDateString('el-GR');
+    barParts.push(`<span>Συνδρομή έως: <strong>${until}</strong></span>`);
+  } else if (access.plan === 'per_use' && access.ok) {
+    barParts.push(`<span>Αποστολές: <strong>${access.credits} απομένουν</strong></span>`);
+  }
+  if (user.daily_limit) {
+    const used = user.daily_used || 0;
+    const cls = used >= user.daily_limit ? 'warn' : (used >= user.daily_limit * 0.8 ? 'warn' : '');
+    barParts.push(`<span class="${cls}">Σήμερα: <strong>${used}/${user.daily_limit}</strong> μηνύματα</span>`);
+  }
+  subBar.innerHTML = barParts.join('');
+
+  // Show paywall or message area
+  if (!access.ok) {
+    paywall.classList.add('visible');
+    msgArea.style.display = 'none';
+  } else {
+    paywall.classList.remove('visible');
+    msgArea.style.display = 'flex';
+  }
+}
+
+async function logout() {
+  await fetch('/api/logout', { method: 'POST' });
+  if (ws) { ws.close(); ws = null; }
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('authPassword').value = '';
+  document.getElementById('authConfirm').value = '';
+  document.getElementById('authError').classList.remove('visible');
+  waConnected = false; contacts = []; selected.clear(); currentUser = null; waContacts = null;
+}
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+function connectWS() {
+  fetchToken().then(token => {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(`${proto}://${location.host}/?token=${token}`);
+    ws.onmessage = e => handleWsMsg(JSON.parse(e.data));
+    ws.onclose = () => setTimeout(connectWS, 3000);
+  }).catch(() => {});
+}
+
+async function fetchToken() {
+  const r = await fetch('/api/token');
+  if (!r.ok) throw new Error('not authenticated');
+  return (await r.json()).token;
+}
+
+function handleWsMsg(msg) {
+  if (msg.type === 'qr') {
+    document.getElementById('qrOverlay').classList.add('visible');
+    document.getElementById('qrImg').src = msg.dataUrl;
+  }
+  if (msg.type === 'status') {
+    waConnected = msg.connected;
+    document.getElementById('statusDot').className = 'status-dot' + (waConnected ? ' connected' : '');
+    document.getElementById('statusLabel').textContent = waConnected ? 'Συνδεδεμένο' : 'Αποσυνδεδεμένο';
+    document.getElementById('sendBtn').disabled = !waConnected;
+    if (waConnected) document.getElementById('qrOverlay').classList.remove('visible');
+  }
+  if (msg.type === 'progress') {
+    removeWaitingLine();
+    appendLog(`[${msg.current}/${msg.total}] ${msg.status === 'ok' ? '✓' : '✗'} ${msg.name}${msg.status === 'fail' ? ': ' + msg.error : ''}`, msg.status);
+  }
+  if (msg.type === 'waiting') {
+    removeWaitingLine();
+    appendLog(`⏳ αναμονή ${msg.seconds}s πριν το επόμενο (anti-ban)...`, 'info waiting-line');
+  }
+  if (msg.type === 'scheduled_started') {
+    appendLog('🕐 Ξεκίνησε προγραμματισμένη αποστολή...', 'info');
+    document.getElementById('log').classList.add('visible');
+    loadSchedules();
+  }
+  if (msg.type === 'done') {
+    removeWaitingLine();
+    loadSchedules();
+    appendLog(`─── Τέλος: ${msg.ok} επιτυχή, ${msg.fail} αποτυχίες ───`, 'info');
+    document.getElementById('sendBtn').disabled = !waConnected;
+    document.getElementById('sendBtn').innerHTML = '▶ Αποστολή';
+    clearAttachment();
+    // Refresh user info (credits may have changed)
+    loadMe().then(() => { if (currentUser) renderPlanUI(currentUser); });
+  }
+}
+
+// ── Contacts ──────────────────────────────────────────────────────────────────
+let waContacts = null, waLoading = false;
+let groups = [];
+
+// ── Groups ────────────────────────────────────────────────────────────────────
+async function loadGroups() {
+  const r = await fetch('/api/groups');
+  if (!r.ok) return;
+  groups = await r.json();
+  populateGroupSelects();
+}
+
+function populateGroupSelects() {
+  const opts = groups.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
+  const filter = document.getElementById('groupFilter');
+  const prev = filter.value;
+  filter.innerHTML = '<option value="">Όλες οι ομάδες</option><option value="none">Χωρίς ομάδα</option>' + opts;
+  if ([...filter.options].some(o => o.value === prev)) filter.value = prev;
+  document.getElementById('addGroup').innerHTML = '<option value="">— Χωρίς ομάδα —</option>' + opts;
+  document.getElementById('editGroup').innerHTML = '<option value="">— Χωρίς ομάδα —</option>' + opts;
+}
+
+function openGroups() {
+  renderGroupList();
+  document.getElementById('groupsModal').classList.add('visible');
+}
+function closeGroups() { document.getElementById('groupsModal').classList.remove('visible'); }
+
+function renderGroupList() {
+  const wrap = document.getElementById('groupList');
+  if (groups.length === 0) {
+    wrap.innerHTML = '<div class="group-empty-note">Δεν έχεις ομάδες ακόμα.<br>Φτιάξε την πρώτη παρακάτω 👇</div>';
+    return;
+  }
+  wrap.innerHTML = groups.map(g => {
+    const count = contacts.filter(c => c.group_id === g.id).length;
+    return `
+    <div class="group-row">
+      <input type="text" id="gname_${g.id}" value="${esc(g.name)}" onkeydown="if(event.key==='Enter') renameGroup(${g.id})" />
+      <span style="font-size:.72rem;color:#8b949e;white-space:nowrap">${count} επ.</span>
+      <button class="btn-icon" onclick="renameGroup(${g.id})" title="Μετονομασία">💾</button>
+      <button class="btn-icon danger" onclick="deleteGroup(${g.id})" title="Διαγραφή">🗑️</button>
+    </div>`;
+  }).join('');
+}
+
+async function createGroup() {
+  const name = document.getElementById('newGroupName').value.trim();
+  if (!name) return;
+  const r = await fetch('/api/groups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+  if (!r.ok) return alert((await r.json()).error);
+  document.getElementById('newGroupName').value = '';
+  await loadGroups();
+  renderGroupList();
+}
+
+async function renameGroup(id) {
+  const name = document.getElementById('gname_' + id).value.trim();
+  if (!name) return alert('Δώσε όνομα ομάδας');
+  const r = await fetch('/api/groups/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+  if (!r.ok) return alert((await r.json()).error);
+  await loadGroups();
+  await loadContacts();
+  renderGroupList();
+}
+
+async function deleteGroup(id) {
+  const g = groups.find(x => x.id === id);
+  if (!confirm(`Διαγραφή ομάδας "${g.name}";\n\nΟι επαφές της ΔΕΝ θα διαγραφούν — απλά θα μείνουν χωρίς ομάδα.`)) return;
+  await fetch('/api/groups/' + id, { method: 'DELETE' });
+  await loadGroups();
+  await loadContacts();
+  renderGroupList();
+}
+
+function switchContactTab(tab) {
+  document.getElementById('tabMyContacts').classList.toggle('active', tab === 'mine');
+  document.getElementById('tabWaContacts').classList.toggle('active', tab === 'wa');
+  document.getElementById('paneMine').classList.toggle('active', tab === 'mine');
+  document.getElementById('paneWa').classList.toggle('active', tab === 'wa');
+  if (tab === 'wa' && waContacts === null) loadWaContacts();
+}
+
+async function loadWaContacts(force = false) {
+  if (waLoading) return;
+  if (!waConnected) {
+    document.getElementById('waContactList').innerHTML =
+      '<div class="contact-empty">Το WhatsApp δεν είναι συνδεδεμένο.<br>Σκάναρε πρώτα το QR.</div>';
+    return;
+  }
+  if (waContacts !== null && !force) { renderWaContacts(); return; }
+  waLoading = true;
+  document.getElementById('waContactList').innerHTML = '<div class="contact-empty">Φόρτωση επαφών από το WhatsApp...<br>(μπορεί να πάρει λίγα δευτερόλεπτα)</div>';
+  try {
+    const r = await fetch('/api/wa/contacts');
+    if (!r.ok) {
+      const err = await r.json();
+      document.getElementById('waContactList').innerHTML = `<div class="contact-empty">${esc(err.error || 'Σφάλμα')}</div>`;
+      return;
+    }
+    waContacts = await r.json();
+    renderWaContacts();
+  } catch {
+    document.getElementById('waContactList').innerHTML = '<div class="contact-empty">Σφάλμα φόρτωσης</div>';
+  } finally {
+    waLoading = false;
+  }
+}
+
+function renderWaContacts() {
+  const list = document.getElementById('waContactList');
+  if (!waContacts) return;
+  const q = (document.getElementById('waSearch').value || '').toLowerCase();
+  const myPhones = new Set(contacts.map(c => c.phone));
+  const items = waContacts.filter(c => !q || c.name.toLowerCase().includes(q) || c.phone.includes(q));
+  if (items.length === 0) {
+    list.innerHTML = '<div class="contact-empty">Δεν βρέθηκαν επαφές</div>';
+    return;
+  }
+  list.innerHTML = items.map(c => {
+    const imported = myPhones.has(c.phone);
+    return `
+    <div class="wa-item">
+      <div class="contact-info">
+        <div class="contact-name">${esc(c.name)}</div>
+        <div class="contact-phone">+${esc(c.phone)}</div>
+      </div>
+      <button class="btn-import" ${imported ? 'disabled' : ''} onclick="importWaContact('${esc(c.phone)}')">
+        ${imported ? '✓ Στη λίστα' : '+ Εισαγωγή'}
+      </button>
+    </div>`;
+  }).join('');
+}
+
+async function importWaContact(phone) {
+  const c = waContacts.find(x => x.phone === phone);
+  if (!c) return;
+  const r = await fetch('/api/contacts', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: c.name, phone: c.phone, salutation: '' })
+  });
+  if (!r.ok) { return alert((await r.json()).error); }
+  await loadContacts();
+  renderWaContacts();
+}
+
+async function loadContacts() {
+  const r = await fetch('/api/contacts');
+  if (!r.ok) return;
+  contacts = await r.json();
+  renderContacts();
+}
+
+function getVisibleContacts() {
+  const gf = document.getElementById('groupFilter').value;
+  if (gf === 'none') return contacts.filter(c => !c.group_id);
+  if (gf) return contacts.filter(c => String(c.group_id) === gf);
+  return contacts;
+}
+
+function renderContacts() {
+  const list = document.getElementById('contactList');
+  const view = getVisibleContacts();
+  const countEl = document.getElementById('contactCount');
+  countEl.textContent = view.length === contacts.length
+    ? `${contacts.length} επαφ${contacts.length === 1 ? 'ή' : 'ές'}`
+    : `${view.length} από ${contacts.length}`;
+  if (contacts.length === 0) { list.innerHTML = '<div class="contact-empty">Δεν υπάρχουν επαφές<br>Πρόσθεσε την πρώτη παρακάτω</div>'; updateSelectedInfo(); return; }
+  if (view.length === 0) { list.innerHTML = '<div class="contact-empty">Καμία επαφή σε αυτή την ομάδα</div>'; updateSelectedInfo(); return; }
+  list.innerHTML = view.map(c => `
+    <div class="contact-item ${selected.has(c.id) ? 'selected' : ''}" onclick="toggleSelect(${c.id}, event)">
+      <input class="contact-checkbox" type="checkbox" ${selected.has(c.id) ? 'checked' : ''} onclick="event.stopPropagation(); toggleSelect(${c.id}, event)" />
+      <div class="contact-info">
+        <div class="contact-name">${esc(fullName(c))}${c.group_name ? `<span class="group-chip">${esc(c.group_name)}</span>` : ''}</div>
+        <div class="contact-phone">+${c.phone}${c.salutation ? ' · ✉️ ' + esc(c.salutation) : ''}</div>
+      </div>
+      <div class="contact-actions">
+        <button class="btn-icon" onclick="openEdit(${c.id}, event)">✏️</button>
+        <button class="btn-icon danger" onclick="deleteContact(${c.id}, event)">🗑️</button>
+      </div>
+    </div>`).join('');
+  updateSelectedInfo();
+}
+
+function toggleSelect(id, e) { if (e.target.tagName === 'BUTTON') return; selected.has(id) ? selected.delete(id) : selected.add(id); renderContacts(); }
+function selectAll()  { getVisibleContacts().forEach(c => selected.add(c.id)); renderContacts(); }
+function selectNone() { selected.clear(); renderContacts(); }
+function updateSelectedInfo() {
+  document.getElementById('selectedInfo').textContent = selected.size === 0
+    ? 'Καμία επιλογή — θα σταλεί σε όλες τις επαφές'
+    : `${selected.size} επαφ${selected.size === 1 ? 'ή' : 'ές'} επιλεγμέν${selected.size === 1 ? 'η' : 'ες'}`;
+  updatePreview();
+}
+
+function fullName(c) { return c.last_name ? `${c.name} ${c.last_name}` : c.name; }
+
+async function addContact() {
+  const name = document.getElementById('addName').value.trim();
+  const last_name = document.getElementById('addLastName').value.trim();
+  const salutation = document.getElementById('addSalutation').value.trim();
+  const phone = document.getElementById('addPhone').value.trim();
+  const group_id = document.getElementById('addGroup').value || null;
+  if (!name || !phone) return alert('Συμπλήρωσε τουλάχιστον όνομα και τηλέφωνο');
+  const r = await fetch('/api/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, last_name, phone, salutation, group_id }) });
+  if (!r.ok) { return alert((await r.json()).error); }
+  document.getElementById('addName').value = '';
+  document.getElementById('addLastName').value = '';
+  document.getElementById('addSalutation').value = '';
+  document.getElementById('addPhone').value = '';
+  loadContacts();
+}
+
+// ── Excel import ──────────────────────────────────────────────────────────────
+function normHeader(s) {
+  return String(s).toLowerCase().replace(/\s/g, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function mapImportRow(row) {
+  const out = { name: '', last_name: '', phone: '', salutation: '', group: '' };
+  for (const [k, v] of Object.entries(row)) {
+    const key = normHeader(k);
+    const val = String(v).trim();
+    if (['ονομα', 'name', 'firstname'].includes(key)) out.name = val;
+    else if (['επωνυμο', 'επιθετο', 'lastname', 'surname'].includes(key)) out.last_name = val;
+    else if (['τηλεφωνο', 'τηλ', 'κινητο', 'phone', 'mobile', 'tel'].includes(key)) out.phone = val;
+    else if (['προσφωνηση', 'salutation'].includes(key)) out.salutation = val;
+    else if (['ομαδα', 'group'].includes(key)) out.group = val;
+  }
+  if (!out.name && !out.last_name) return null;
+  if (!out.phone) return null;
+  return out;
+}
+
+function onImportFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const wb = XLSX.read(reader.result, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      const rows = raw.map(mapImportRow).filter(Boolean);
+      if (rows.length === 0) {
+        alert('Δεν βρέθηκαν έγκυρες γραμμές.\n\nΤο Excel χρειάζεται γραμμή επικεφαλίδων με στήλες:\nΌνομα, Επώνυμο, Τηλέφωνο, Προσφώνηση, Ομάδα\n(υποχρεωτικά: Όνομα ή Επώνυμο + Τηλέφωνο)');
+        return;
+      }
+      const withGroup = rows.filter(r => r.group).length;
+      if (!confirm(`Βρέθηκαν ${rows.length} επαφές (${withGroup} με ομάδα). Εισαγωγή;`)) return;
+      const r = await fetch('/api/contacts/import', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows })
+      });
+      const data = await r.json();
+      if (!r.ok) return alert(data.error);
+      alert(`Η εισαγωγή ολοκληρώθηκε ✓\n\nΝέες επαφές: ${data.added}\nΠαραλείφθηκαν: ${data.skipped} (διπλά νούμερα ή ελλιπή στοιχεία)\nΝέες ομάδες: ${data.groupsCreated}`);
+      await loadGroups();
+      await loadContacts();
+      renderWaContacts();
+    } catch (err) {
+      alert('Σφάλμα ανάγνωσης αρχείου: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  e.target.value = '';
+}
+
+async function deleteContact(id, e) {
+  e.stopPropagation();
+  if (!confirm(`Διαγραφή "${fullName(contacts.find(x=>x.id===id))}";`)) return;
+  await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
+  selected.delete(id); loadContacts();
+}
+
+function openEdit(id, e) {
+  e.stopPropagation();
+  const c = contacts.find(x => x.id === id);
+  editId = id;
+  document.getElementById('editName').value = c.name;
+  document.getElementById('editLastName').value = c.last_name || '';
+  document.getElementById('editSalutation').value = c.salutation || '';
+  document.getElementById('editPhone').value = c.phone;
+  document.getElementById('editGroup').value = c.group_id ? String(c.group_id) : '';
+  document.getElementById('editModal').classList.add('visible');
+}
+function closeModal() { editId = null; document.getElementById('editModal').classList.remove('visible'); }
+async function saveEdit() {
+  const name = document.getElementById('editName').value.trim();
+  const last_name = document.getElementById('editLastName').value.trim();
+  const salutation = document.getElementById('editSalutation').value.trim();
+  const phone = document.getElementById('editPhone').value.trim();
+  const group_id = document.getElementById('editGroup').value || null;
+  if (!name || !phone) return alert('Συμπλήρωσε όνομα και τηλέφωνο');
+  await fetch(`/api/contacts/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, last_name, phone, salutation, group_id }) });
+  closeModal(); loadContacts();
+}
+
+// ── Personalization ───────────────────────────────────────────────────────────
+const NAME_TAG_RE = /\{(όνομα|ονομα|name)\}/giu;
+
+function insertNameTag() {
+  const ta = document.getElementById('msgText');
+  const start = ta.selectionStart ?? ta.value.length;
+  const end = ta.selectionEnd ?? start;
+  ta.value = ta.value.slice(0, start) + '{όνομα}' + ta.value.slice(end);
+  ta.focus();
+  const pos = start + '{όνομα}'.length;
+  ta.setSelectionRange(pos, pos);
+  updatePreview();
+}
+
+function updatePreview() {
+  const box = document.getElementById('msgPreview');
+  const txt = document.getElementById('msgText').value;
+  NAME_TAG_RE.lastIndex = 0;
+  if (!NAME_TAG_RE.test(txt) || contacts.length === 0) {
+    box.classList.remove('visible');
+    return;
+  }
+  const sample = (selected.size > 0 ? contacts.find(c => selected.has(c.id)) : contacts[0]) || contacts[0];
+  const greet = (sample.salutation || '').trim();
+  NAME_TAG_RE.lastIndex = 0;
+  const result = greet
+    ? txt.replace(NAME_TAG_RE, greet)
+    : txt.replace(/[ \t]*\{(όνομα|ονομα|name)\}/giu, '').replace(/ {2,}/g, ' ').trim();
+  box.innerHTML = '<strong>Προεπισκόπηση — ' + esc(fullName(sample)) + (greet ? '' : ' (χωρίς προσφώνηση)') + '</strong>';
+  box.appendChild(document.createTextNode(result));
+  box.classList.add('visible');
+}
+
+// ── Scheduled sends ───────────────────────────────────────────────────────────
+function openSchedule() {
+  const message = document.getElementById('msgText').value.trim();
+  if (!message && !attachedFile) return alert('Γράψε ένα μήνυμα ή επισύναψε ένα αρχείο πρώτα');
+  const total = selected.size > 0 ? selected.size : contacts.length;
+  if (total === 0) return alert('Δεν υπάρχουν επαφές');
+  document.getElementById('schedSummary').innerHTML =
+    `Παραλήπτες: <strong>${total}</strong> επαφ${total === 1 ? 'ή' : 'ές'}` +
+    (attachedFile ? ` · 📎 ${esc(attachedFile.filename)}` : '');
+  // Προεπιλογή: αύριο στις 10:00 τοπική ώρα
+  const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(10, 0, 0, 0);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  document.getElementById('scheduleAt').value = d.toISOString().slice(0, 16);
+  document.getElementById('scheduleModal').classList.add('visible');
+}
+function closeSchedule() { document.getElementById('scheduleModal').classList.remove('visible'); }
+
+async function confirmSchedule() {
+  const val = document.getElementById('scheduleAt').value;
+  if (!val) return alert('Διάλεξε ημερομηνία και ώρα');
+  const when = new Date(val); // τοπική ώρα -> Date
+  if (when.getTime() < Date.now() + 60 * 1000) return alert('Η ώρα πρέπει να είναι στο μέλλον');
+
+  const body = {
+    message: document.getElementById('msgText').value.trim(),
+    contactIds: selected.size > 0 ? [...selected] : [],
+    scheduled_at: when.toISOString(),
+  };
+  if (attachedFile) body.media = attachedFile;
+
+  const r = await fetch('/api/schedule', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await r.json();
+  if (!r.ok) return alert(data.error);
+  closeSchedule();
+  document.getElementById('msgText').value = '';
+  updatePreview();
+  clearAttachment();
+  loadSchedules();
+}
+
+async function loadSchedules() {
+  const r = await fetch('/api/schedule');
+  if (!r.ok) return;
+  const items = await r.json();
+  const panel = document.getElementById('schedPanel');
+  const list = document.getElementById('schedList');
+  if (items.length === 0) { panel.classList.remove('visible'); return; }
+  panel.classList.add('visible');
+  list.innerHTML = items.map(s => {
+    const d = new Date(s.scheduled_at);
+    const when = d.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit' }) + ' ' +
+      d.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' });
+    const who = s.contact_ids.length > 0 ? `${s.contact_ids.length} επαφές` : 'όλες';
+    const statusMap = { pending: '⏳ εκκρεμεί', sent: '✓ στάλθηκε', cancelled: '— ακυρώθηκε', failed: '✗ ' + (s.error || 'απέτυχε') };
+    return `
+    <div class="sched-item">
+      <span class="sched-when">${when}</span>
+      <span class="sched-snippet">${s.media_name ? '📎 ' + esc(s.media_name) + ' ' : ''}${esc(s.body)} <em style="color:#484f58">(${who})</em></span>
+      <span class="sched-status ${s.status}">${statusMap[s.status] || s.status}</span>
+      ${s.status === 'pending' ? `<button class="sched-cancel" onclick="cancelSchedule(${s.id})" title="Ακύρωση">✕</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function cancelSchedule(id) {
+  if (!confirm('Ακύρωση προγραμματισμένης αποστολής;')) return;
+  const r = await fetch('/api/schedule/' + id, { method: 'DELETE' });
+  if (!r.ok) alert((await r.json()).error);
+  loadSchedules();
+}
+
+// ── Send ──────────────────────────────────────────────────────────────────────
+let attachedFile = null;
+const MAX_FILE_MB = 15;
+
+function onFilePicked(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > MAX_FILE_MB * 1024 * 1024) {
+    alert(`Το αρχείο είναι πολύ μεγάλο (μέγιστο ${MAX_FILE_MB} MB)`);
+    e.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result; // "data:image/png;base64,XXXX"
+    attachedFile = {
+      mimetype: file.type || 'application/octet-stream',
+      data: dataUrl.split(',')[1],
+      filename: file.name,
+    };
+    document.getElementById('attachName').textContent = `📎 ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+    document.getElementById('attachChip').classList.add('visible');
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearAttachment() {
+  attachedFile = null;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('attachChip').classList.remove('visible');
+}
+
+async function sendMessages() {
+  const message = document.getElementById('msgText').value.trim();
+  if (!message && !attachedFile) return alert('Γράψε ένα μήνυμα ή επισύναψε ένα αρχείο');
+  const contactIds = selected.size > 0 ? [...selected] : [];
+  const total = contactIds.length || contacts.length;
+  const what = attachedFile ? (message ? 'μήνυμα + αρχείο' : 'αρχείο') : 'μήνυμα';
+  if (!confirm(`Αποστολή (${what}) σε ${total} επαφ${total === 1 ? 'ή' : 'ές'};`)) return;
+
+  document.getElementById('sendBtn').disabled = true;
+  document.getElementById('sendBtn').innerHTML = '⏳ Αποστολή...';
+  clearLog();
+
+  const body = { message, contactIds };
+  if (attachedFile) body.media = attachedFile;
+
+  const r = await fetch('/api/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) {
+    const err = await r.json();
+    if (err.error === 'payment_required') { renderPlanUI(currentUser); return; }
+    alert(err.error);
+    document.getElementById('sendBtn').disabled = false;
+    document.getElementById('sendBtn').innerHTML = '▶ Αποστολή';
+    return;
+  }
+  document.getElementById('log').classList.add('visible');
+}
+
+function appendLog(text, cls) {
+  const log = document.getElementById('log');
+  const d = document.createElement('div'); d.className = `log-line ${cls}`; d.textContent = text;
+  log.appendChild(d); log.scrollTop = log.scrollHeight;
+}
+function removeWaitingLine() {
+  document.querySelectorAll('#log .waiting-line').forEach(el => el.remove());
+}
+function clearLog() { document.getElementById('log').innerHTML = ''; }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── History ───────────────────────────────────────────────────────────────────
+async function openHistory() {
+  document.getElementById('historyModal').classList.add('visible');
+  const list = document.getElementById('historyList');
+  list.innerHTML = '<div class="history-empty">Φόρτωση...</div>';
+  const r = await fetch('/api/history');
+  if (!r.ok) { list.innerHTML = '<div class="history-empty">Σφάλμα φόρτωσης</div>'; return; }
+  const items = await r.json();
+  if (items.length === 0) {
+    list.innerHTML = '<div class="history-empty">Δεν έχεις στείλει κανένα μήνυμα ακόμα</div>';
+    return;
+  }
+  list.innerHTML = items.map(m => {
+    const d = new Date(m.sent_at.replace(' ', 'T') + 'Z');
+    const dateStr = d.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+      + ' ' + d.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' });
+    const mediaTag = m.media_name ? `📎 ${esc(m.media_name)} ` : '';
+    const recips = (m.recipients || []).map(rc => `
+      <div class="history-recip">
+        <span class="r-status">${rc.status === 'ok' ? '✓' : '✗'}</span>
+        <span class="r-name">${esc(rc.name)}</span>
+        <span class="r-phone">+${esc(rc.phone)}</span>
+        ${rc.error ? `<span class="r-err">${esc(rc.error)}</span>` : ''}
+      </div>`).join('');
+    return `
+      <div class="history-item" onclick="this.classList.toggle('open')">
+        <div class="history-item-head">
+          <span class="history-date">${dateStr}</span>
+          <span class="history-snippet">${mediaTag}${esc(m.body)}</span>
+          <span class="history-counts"><span class="c-ok">✓${m.ok}</span> ${m.fail > 0 ? `<span class="c-fail">✗${m.fail}</span>` : ''} / ${m.total}</span>
+        </div>
+        <div class="history-detail">
+          <div class="history-body">${mediaTag ? mediaTag + '<br>' : ''}${esc(m.body)}</div>
+          <div class="history-recips">${recips || '<span style="color:#484f58">Σε εξέλιξη ή χωρίς παραλήπτες</span>'}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function closeHistory() { document.getElementById('historyModal').classList.remove('visible'); }
+document.getElementById('historyModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeHistory(); });
+
+document.getElementById('editModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+document.getElementById('groupsModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeGroups(); });
+document.getElementById('scheduleModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeSchedule(); });
+
+loadMe();
+</script>
+</body>
+</html>

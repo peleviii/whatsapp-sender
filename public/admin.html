@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — WhatsApp Sender</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; }
+
+  /* ── Key screen ── */
+  .auth-screen { display: none; align-items: center; justify-content: center; min-height: 100vh; }
+  .auth-screen.visible { display: flex; }
+  .auth-card { background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 36px 32px; width: 380px; }
+  .auth-logo { text-align: center; margin-bottom: 24px; }
+  .auth-logo .icon { font-size: 2.6rem; }
+  .auth-logo h1 { font-size: 1.2rem; font-weight: 700; margin-top: 8px; }
+  .auth-logo p { color: #8b949e; font-size: .83rem; margin-top: 4px; }
+  .auth-field { margin-bottom: 13px; }
+  .auth-field label { display: block; font-size: .8rem; color: #8b949e; margin-bottom: 5px; }
+  .auth-field input { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; padding: 10px 12px; border-radius: 8px; font-size: .88rem; outline: none; transition: border-color .15s; }
+  .auth-field input:focus { border-color: #238636; }
+  .btn-auth { width: 100%; background: #238636; border: none; color: #fff; padding: 11px; border-radius: 8px; font-size: .92rem; font-weight: 600; cursor: pointer; margin-top: 4px; transition: background .15s; }
+  .btn-auth:hover { background: #2ea043; }
+  .auth-alert { border-radius: 8px; padding: 10px 12px; font-size: .83rem; margin-bottom: 14px; display: none; background: rgba(248,81,73,.1); border: 1px solid rgba(248,81,73,.4); color: #f85149; }
+  .auth-alert.visible { display: block; }
+
+  /* ── App ── */
+  .app { display: none; flex-direction: column; min-height: 100vh; }
+  .app.visible { display: flex; }
+  header { background: #161b22; border-bottom: 1px solid #30363d; padding: 12px 18px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 1rem; font-weight: 700; flex: 1; }
+  .btn-sm { background: none; border: 1px solid #30363d; color: #8b949e; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: .8rem; transition: all .15s; }
+  .btn-sm:hover { border-color: #58a6ff; color: #58a6ff; }
+  .btn-sm.danger:hover { border-color: #f85149; color: #f85149; }
+
+  .content { padding: 18px; overflow-x: auto; }
+  .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .stat { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 12px 18px; min-width: 130px; }
+  .stat .num { font-size: 1.4rem; font-weight: 800; color: #3fb950; }
+  .stat .lbl { font-size: .75rem; color: #8b949e; margin-top: 2px; }
+
+  table { width: 100%; border-collapse: collapse; background: #161b22; border: 1px solid #30363d; border-radius: 10px; overflow: hidden; font-size: .84rem; }
+  th { text-align: left; padding: 10px 12px; background: #1c2128; color: #8b949e; font-size: .74rem; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid #30363d; white-space: nowrap; }
+  td { padding: 10px 12px; border-bottom: 1px solid #21262d; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #1c2128; }
+  .muted { color: #8b949e; font-size: .78rem; }
+
+  .plan-chip { font-size: .73rem; padding: 3px 9px; border-radius: 20px; font-weight: 600; display: inline-block; }
+  .plan-chip.trial   { background: rgba(88,166,255,.15); color: #58a6ff; border: 1px solid rgba(88,166,255,.3); }
+  .plan-chip.yearly  { background: rgba(63,185,80,.15);  color: #3fb950;  border: 1px solid rgba(63,185,80,.3); }
+  .plan-chip.per_use { background: rgba(210,153,34,.15); color: #e3b341;  border: 1px solid rgba(210,153,34,.3); }
+  .status-chip { font-size: .73rem; padding: 3px 9px; border-radius: 20px; font-weight: 600; display: inline-block; }
+  .status-chip.active  { background: rgba(63,185,80,.15); color: #3fb950; border: 1px solid rgba(63,185,80,.3); }
+  .status-chip.expired { background: rgba(248,81,73,.15); color: #f85149; border: 1px solid rgba(248,81,73,.3); }
+
+  .empty { padding: 40px; text-align: center; color: #484f58; }
+
+  /* ── Modal ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 10; }
+  .modal-overlay.visible { display: flex; }
+  .modal { background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 26px; width: 400px; max-width: calc(100vw - 32px); }
+  .modal h3 { font-size: 1rem; margin-bottom: 4px; }
+  .modal .sub { color: #8b949e; font-size: .8rem; margin-bottom: 18px; }
+  .modal-field { margin-bottom: 14px; }
+  .modal-field label { display: block; font-size: .8rem; color: #8b949e; margin-bottom: 5px; }
+  .modal-field input, .modal-field select { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; padding: 9px 11px; border-radius: 8px; font-size: .86rem; outline: none; }
+  .modal-field input:focus, .modal-field select:focus { border-color: #238636; }
+  .modal-field input[type="date"] { color-scheme: dark; }
+  .modal-hint { font-size: .74rem; color: #484f58; margin-top: 4px; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+  .btn-primary { background: #238636; border: none; color: #fff; padding: 9px 18px; border-radius: 8px; font-size: .86rem; font-weight: 600; cursor: pointer; }
+  .btn-primary:hover { background: #2ea043; }
+  .btn-cancel { background: none; border: 1px solid #30363d; color: #8b949e; padding: 9px 16px; border-radius: 8px; font-size: .86rem; cursor: pointer; }
+  .btn-cancel:hover { color: #e6edf3; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- ── Key screen ── -->
+<div class="auth-screen visible" id="keyScreen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="icon">🔐</div>
+      <h1>Admin Panel</h1>
+      <p>Διαχείριση χρηστών & συνδρομών</p>
+    </div>
+    <div class="auth-alert" id="keyAlert"></div>
+    <div class="auth-field">
+      <label>Admin Key</label>
+      <input type="password" id="keyInput" placeholder="••••••••" onkeydown="if(event.key==='Enter')enterKey()">
+    </div>
+    <button class="btn-auth" onclick="enterKey()">Είσοδος</button>
+  </div>
+</div>
+
+<!-- ── App ── -->
+<div class="app" id="app">
+  <header>
+    <h1>🔐 Admin Panel</h1>
+    <button class="btn-sm" onclick="loadUsers()">↻ Ανανέωση</button>
+    <button class="btn-sm danger" onclick="logout()">Έξοδος</button>
+  </header>
+  <div class="content">
+    <div class="stats" id="stats"></div>
+    <div id="tableWrap"></div>
+  </div>
+</div>
+
+<!-- ── Edit modal ── -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h3 id="modalTitle">Διαχείριση χρήστη</h3>
+    <div class="sub" id="modalSub"></div>
+
+    <div class="modal-field">
+      <label>Πλάνο</label>
+      <select id="mPlan" onchange="onPlanChange()">
+        <option value="trial">Trial (δοκιμή)</option>
+        <option value="yearly">Yearly (ετήσιο)</option>
+        <option value="per_use">Per use (ανά αποστολή)</option>
+      </select>
+    </div>
+
+    <div class="modal-field" id="fieldUntil">
+      <label>Ημερομηνία λήξης</label>
+      <input type="date" id="mUntil">
+      <div class="modal-hint">Η πρόσβαση ισχύει μέχρι το τέλος αυτής της ημέρας (23:59).</div>
+    </div>
+
+    <div class="modal-field hidden" id="fieldCredits">
+      <label>Credits (αποστολές που απομένουν)</label>
+      <input type="number" id="mCredits" min="0" step="1">
+      <div class="modal-hint">Ορίζεται το συνολικό υπόλοιπο, όχι προσθήκη.</div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Άκυρο</button>
+      <button class="btn-primary" onclick="saveUser()">Αποθήκευση</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let adminKey = localStorage.getItem('admin_key') || '';
+let users = [];
+let editUsername = null;
+
+// ── Auth ──
+function show(id, vis) { document.getElementById(id).classList.toggle('visible', vis); }
+
+function enterKey() {
+  const k = document.getElementById('keyInput').value.trim();
+  if (!k) return;
+  adminKey = k;
+  loadUsers(true);
+}
+
+function logout() {
+  adminKey = '';
+  localStorage.removeItem('admin_key');
+  show('app', false); show('keyScreen', true);
+}
+
+function keyError(msg) {
+  const a = document.getElementById('keyAlert');
+  a.textContent = msg; a.classList.add('visible');
+}
+
+// ── Data ──
+async function loadUsers(fromLogin = false) {
+  try {
+    const r = await fetch('/api/admin/users', { headers: { 'x-admin-key': adminKey } });
+    if (r.status === 403) {
+      if (fromLogin) keyError('Λάθος admin key');
+      else logout();
+      return;
+    }
+    users = await r.json();
+    localStorage.setItem('admin_key', adminKey);
+    show('keyScreen', false); show('app', true);
+    render();
+  } catch (e) {
+    keyError('Σφάλμα σύνδεσης με τον server');
+  }
+}
+
+// ── Render ──
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = new Date(s.replace(' ', 'T'));
+  if (isNaN(d)) return s;
+  return d.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function daysLeft(s) {
+  if (!s) return null;
+  const d = new Date(s.replace(' ', 'T'));
+  const diff = Math.ceil((d - new Date()) / 86400000);
+  return diff;
+}
+
+function expiryOf(u) {
+  if (u.plan === 'yearly') return u.subscription_until;
+  if (u.plan === 'trial') return u.trial_ends_at;
+  return null; // per_use δεν έχει ημερομηνία
+}
+
+function render() {
+  // stats
+  const active = users.filter(u => u.access.ok).length;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="num">${users.length}</div><div class="lbl">Σύνολο χρηστών</div></div>
+    <div class="stat"><div class="num">${active}</div><div class="lbl">Ενεργοί</div></div>
+    <div class="stat"><div class="num" style="color:#f85149">${users.length - active}</div><div class="lbl">Ληγμένοι</div></div>`;
+
+  if (users.length === 0) {
+    document.getElementById('tableWrap').innerHTML = '<div class="empty">Δεν υπάρχουν χρήστες ακόμα</div>';
+    return;
+  }
+
+  document.getElementById('tableWrap').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Χρήστης</th><th>Τηλέφωνο</th><th>Εγγραφή</th><th>Πλάνο</th><th>Λήξη</th><th>Credits</th><th>Κατάσταση</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${users.map(u => {
+          const exp = expiryOf(u);
+          const dl = daysLeft(exp);
+          const expStr = u.plan === 'per_use'
+            ? '<span class="muted">—</span>'
+            : `${fmtDate(exp)} ${dl !== null ? `<span class="muted">(${dl > 0 ? dl + ' μέρες' : 'έληξε'})</span>` : ''}`;
+          return `
+          <tr>
+            <td><strong>${esc(u.username)}</strong> <span class="muted">#${u.id}</span></td>
+            <td>${u.phone ? `<a href="tel:+${esc(u.phone)}" style="color:#58a6ff;text-decoration:none">+${esc(u.phone)}</a>` : '<span class="muted">—</span>'}</td>
+            <td class="muted">${fmtDate(u.created_at)}</td>
+            <td><span class="plan-chip ${u.plan}">${u.plan}</span></td>
+            <td>${expStr}</td>
+            <td>${u.plan === 'per_use' ? u.per_use_credits : '<span class="muted">—</span>'}</td>
+            <td><span class="status-chip ${u.access.ok ? 'active' : 'expired'}">${u.access.ok ? 'Ενεργός' : 'Έληξε'}</span></td>
+            <td style="text-align:right">
+              <button class="btn-sm" onclick="openEdit('${esc(u.username)}')">⚙️ Διαχείριση</button>
+              <button class="btn-sm danger" onclick="deleteUser(${u.id}, '${esc(u.username)}')">🗑️</button>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+// ── Edit modal ──
+function openEdit(username) {
+  const u = users.find(x => x.username === username);
+  if (!u) return;
+  editUsername = username;
+  document.getElementById('modalTitle').textContent = `Διαχείριση: ${username}`;
+  document.getElementById('modalSub').textContent = `Εγγραφή: ${fmtDate(u.created_at)}`;
+  document.getElementById('mPlan').value = u.plan;
+  const exp = expiryOf(u) || u.trial_ends_at;
+  document.getElementById('mUntil').value = exp ? exp.slice(0, 10) : '';
+  document.getElementById('mCredits').value = u.per_use_credits;
+  onPlanChange();
+  document.getElementById('editModal').classList.add('visible');
+}
+
+function onPlanChange() {
+  const plan = document.getElementById('mPlan').value;
+  document.getElementById('fieldUntil').classList.toggle('hidden', plan === 'per_use');
+  document.getElementById('fieldCredits').classList.toggle('hidden', plan !== 'per_use');
+}
+
+function closeModal() {
+  editUsername = null;
+  document.getElementById('editModal').classList.remove('visible');
+}
+
+async function saveUser() {
+  const plan = document.getElementById('mPlan').value;
+  const until = document.getElementById('mUntil').value; // YYYY-MM-DD
+  const credits = parseInt(document.getElementById('mCredits').value, 10);
+
+  if (plan !== 'per_use' && !until) return alert('Διάλεξε ημερομηνία λήξης');
+  if (plan === 'per_use' && (isNaN(credits) || credits < 0)) return alert('Βάλε έγκυρο αριθμό credits');
+
+  const body = { username: editUsername, plan };
+  if (plan === 'per_use') body.credits = credits;
+  else body.until = until;
+
+  const r = await fetch('/api/admin/update-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) return alert((await r.json()).error || 'Σφάλμα');
+  closeModal();
+  loadUsers();
+}
+
+async function deleteUser(id, username) {
+  if (!confirm(`Διαγραφή χρήστη "${username}";\n\nΘα διαγραφούν και όλες οι επαφές του. Αυτό δεν αναιρείται.`)) return;
+  const r = await fetch(`/api/admin/users/${id}`, {
+    method: 'DELETE',
+    headers: { 'x-admin-key': adminKey },
+  });
+  if (!r.ok) return alert((await r.json()).error || 'Σφάλμα');
+  loadUsers();
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;'); }
+
+document.getElementById('editModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+
+// auto-login if key saved
+if (adminKey) loadUsers();
+</script>
+</body>
+</html>
