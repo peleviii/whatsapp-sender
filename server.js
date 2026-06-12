@@ -754,6 +754,21 @@ app.post('/api/wa/connect', authMiddleware, (req, res) => {
   res.json({ ok: true });
 });
 
+// Σύνδεση με 8ψήφιο κωδικό αντί για QR (για χρήστες που μπαίνουν από το κινητό τους)
+app.post('/api/wa/pairing-code', authMiddleware, async (req, res) => {
+  const phone = normalizePhone(req.body.phone);
+  if (phone.length < 10) return res.status(400).json({ error: 'Δώσε έγκυρο αριθμό WhatsApp (π.χ. 6912345678)' });
+  const entry = waClients.get(req.user.id) || getOrCreateWaClient(req.user.id);
+  if (entry.ready) return res.status(400).json({ error: 'Το WhatsApp είναι ήδη συνδεδεμένο' });
+  if (!entry.instance) return res.status(503).json({ error: 'Ο client ξεκινάει ακόμα — δοκίμασε σε λίγα δευτερόλεπτα' });
+  try {
+    const code = await entry.instance.requestPairingCode(phone);
+    res.json({ ok: true, code });
+  } catch (e) {
+    res.status(500).json({ error: 'Δεν ήταν δυνατή η έκδοση κωδικού. Δοκίμασε ξανά σε λίγο. (' + e.message + ')' });
+  }
+});
+
 // Επαφές από τον τηλεφωνικό κατάλογο του συνδεδεμένου WhatsApp
 app.get('/api/wa/contacts', authMiddleware, async (req, res) => {
   const entry = waClients.get(req.user.id);
